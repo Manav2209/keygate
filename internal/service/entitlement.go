@@ -91,7 +91,7 @@ func (s *EntitlementService) Check(ctx context.Context, in CheckInput) (*CheckRe
 		}
 
 		switch e.ValueType {
-		case "bool":
+		case "bool", "flag":
 			fs.Enabled = e.Value == "true"
 		case "quota":
 			limit, _ := strconv.ParseInt(e.Value, 10, 64)

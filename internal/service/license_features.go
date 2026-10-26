@@ -60,11 +60,11 @@ func licenseFeatures(ctx context.Context, st *store.Store, lic *model.License) (
 }
 
 // featureValues is the feature map sent in verify answers and tokens:
-// booleans as true/false, everything else as its string value.
+// bool and flag features as true/false, everything else as its string value.
 func featureValues(ents []*model.Entitlement) map[string]any {
 	m := make(map[string]any, len(ents))
 	for _, e := range ents {
-		if e.ValueType == "bool" {
+		if e.ValueType == "bool" || e.ValueType == "flag" {
 			m[e.Feature] = e.Value == "true"
 		} else {
 			m[e.Feature] = e.Value
