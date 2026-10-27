@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"crypto/ed25519"
 	"crypto/rand"
 	"fmt"
@@ -9,12 +10,14 @@ import (
 	"testing"
 
 	"github.com/tabloy/keygate/internal/license"
+	"github.com/tabloy/keygate/internal/model"
 	"github.com/tabloy/keygate/internal/service"
 )
 
 // Both boolean spellings accepted by the admin API must stay booleans
 // everywhere clients read them. In particular, a disabled flag must not
 // become enabled in entitlements or a truthy string in an offline token.
+// An older flag that is not "false" stays enabled (see featureEnabled).
 func TestFlagEntitlementsMatchBooleans(t *testing.T) {
 	f := newAPIFixture(t)
 	admin := &AdminHandler{Store: f.s}
@@ -30,6 +33,17 @@ func TestFlagEntitlementsMatchBooleans(t *testing.T) {
 			}
 			want[feature] = value
 		}
+	}
+	// Flags stored before v0.1.10 were not checked and always granted the
+	// feature; such a value keeps doing so.
+	for _, value := range []string{"yes", "1", "", "False"} {
+		feature := "flag_legacy_" + value
+		if err := f.s.CreateEntitlement(context.Background(), &model.Entitlement{
+			PlanID: f.planA.ID, Feature: feature, ValueType: "flag", Value: value,
+		}); err != nil {
+			t.Fatal(err)
+		}
+		want[feature] = true
 	}
 
 	pub, priv, err := ed25519.GenerateKey(rand.Reader)
@@ -78,7 +92,11 @@ func TestFlagEntitlementsMatchBooleans(t *testing.T) {
 	}
 	features := out["data"].(map[string]any)["features"].(map[string]any)
 	for feature, expected := range want {
-		entry := features[feature].(map[string]any)
+		entry, ok := features[feature].(map[string]any)
+		if !ok {
+			t.Errorf("entitlement %s missing from %v", feature, features)
+			continue
+		}
 		if got, ok := entry["enabled"].(bool); !ok || got != expected {
 			t.Errorf("entitlement %s enabled = %#v, want %t", feature, entry["enabled"], expected)
 		}
